@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>번호로 링크 이동기</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: linear-gradient(135deg, #141e30, #243b55);
+      color: #222;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 480px;
+      background: #ffffff;
+      border-radius: 18px;
+      padding: 24px 20px 20px;
+      box-shadow: 0 18px 40px rgba(0,0,0,0.35);
+    }
+
+    .card h1 {
+      margin: 0 0 6px;
+      font-size: 1.4rem;
+      text-align: center;
+    }
+
+    .card p.sub {
+      margin: 0 0 18px;
+      font-size: 0.86rem;
+      color: #666;
+      text-align: center;
+    }
+
+    label {
+      display: block;
+      font-size: 0.84rem;
+      margin-bottom: 4px;
+      color: #444;
+    }
+
+    select, input[type="text"] {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid #d0d4dd;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    select:focus, input[type="text"]:focus {
+      border-color: #4f8cff;
+      box-shadow: 0 0 0 2px rgba(79,140,255,0.18);
+    }
+
+    .field {
+      margin-bottom: 14px;
+    }
+
+    .hint {
+      font-size: 0.78rem;
+      color: #888;
+      margin-top: 4px;
+    }
+
+    .preview {
+      font-size: 0.8rem;
+      color: #555;
+      background: #f5f7fb;
+      border-radius: 8px;
+      padding: 8px 10px;
+      margin-top: 6px;
+      word-break: break-all;
+    }
+
+    .btn-main {
+      width: 100%;
+      margin-top: 10px;
+      padding: 11px;
+      border-radius: 999px;
+      border: none;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      background: linear-gradient(135deg, #4f8cff, #6a5cff);
+      color: #fff;
+      box-shadow: 0 8px 20px rgba(79,140,255,0.45);
+      transition: transform 0.08s ease, box-shadow 0.08s ease, opacity 0.08s ease;
+    }
+
+    .btn-main:active {
+      transform: translateY(1px);
+      box-shadow: 0 4px 10px rgba(79,140,255,0.35);
+      opacity: 0.9;
+    }
+
+    .recent-wrap {
+      margin-top: 18px;
+      border-top: 1px solid #eceff5;
+      padding-top: 10px;
+    }
+
+    .recent-title {
+      font-size: 0.8rem;
+      color: #666;
+      margin-bottom: 8px;
+    }
+
+    .recent-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .recent-chip {
+      border-radius: 999px;
+      border: none;
+      padding: 6px 10px;
+      font-size: 0.8rem;
+      background: #f1f3fb;
+      color: #333;
+      cursor: pointer;
+      transition: background 0.1s ease, transform 0.05s ease;
+    }
+
+    .recent-chip:active {
+      background: #dfe4ff;
+      transform: translateY(1px);
+    }
+
+    .footer {
+      margin-top: 10px;
+      font-size: 0.72rem;
+      color: #999;
+      text-align: center;
+    }
+
+    @media (max-width: 400px) {
+      .card {
+        padding: 20px 16px 16px;
+      }
+      .card h1 {
+        font-size: 1.25rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>번호로 바로 이동</h1>
+    <p class="sub">사이트 고르고 번호만 치면 링크 자동 완성 후 이동합니다.</p>
+
+    <!-- 사이트 선택 -->
+    <div class="field">
+      <label for="siteSelect">사이트 선택</label>
+      <select id="siteSelect">
+        <!-- JS에서 채움 -->
+      </select>
+      <div id="patternPreview" class="preview"></div>
+    </div>
+
+    <!-- 번호 입력 -->
+    <div class="field">
+      <label for="numberInput">번호</label>
+      <input
+        id="numberInput"
+        type="text"
+        inputmode="numeric"
+        autocomplete="off"
+        placeholder="예: 123456"
+      >
+      <div class="hint">Enter 키를 눌러도 이동합니다.</div>
+    </div>
+
+    <!-- 이동 버튼 -->
+    <button class="btn-main" id="goButton">이 번호로 이동하기</button>
+
+    <!-- 최근 번호 -->
+    <div class="recent-wrap" id="recentWrap" style="display:none;">
+      <div class="recent-title">최근 입력한 번호</div>
+      <div class="recent-list" id="recentList"></div>
+    </div>
+
+    <div class="footer">
+      브라우저에만 저장되며, 번호 정보는 서버에 전송되지 않습니다.
+    </div>
+  </div>
+
+  <script>
+    // 사이트 목록 정의: { id, name, pattern }
+    // pattern 안에 {num} 위치에 입력 번호가 들어갑니다.
+    const SITES = [
+      {
+        id: "hitomi-reader",
+        name: "Hitomi Reader",
+        pattern: "https://hitomi.la/reader/{num}.html"
+      },
+      {
+        id: "hitomi-galleries",
+        name: "Hitomi Galleries",
+        pattern: "https://hitomi.la/galleries/{num}.html"
+      },
+      {
+        id: "custom-base",
+        name: "직접 지정 (기본: Hitomi Reader)",
+        pattern: "https://hitomi.la/reader/{num}.html"
+      }
+      // 필요하면 여기 더 추가 가능
+      // { id: "example", name: "예시 사이트", pattern: "https://example.com/{num}" }
+    ];
+
+    const STORAGE_KEY = "numLinkRecentList_v1";
+
+    const siteSelect = document.getElementById("siteSelect");
+    const patternPreview = document.getElementById("patternPreview");
+    const numberInput = document.getElementById("numberInput");
+    const goButton = document.getElementById("goButton");
+    const recentWrap = document.getElementById("recentWrap");
+    const recentList = document.getElementById("recentList");
+
+    // --- 사이트 드롭다운 채우기 ---
+    function initSiteSelect() {
+      SITES.forEach(site => {
+        const opt = document.createElement("option");
+        opt.value = site.id;
+        opt.textContent = site.name;
+        siteSelect.appendChild(opt);
+      });
+      siteSelect.value = "hitomi-reader";
+      updatePatternPreview();
+    }
+
+    function getCurrentSite() {
+      const siteId = siteSelect.value;
+      return SITES.find(s => s.id === siteId);
+    }
+
+    function updatePatternPreview(sampleNum = "123456") {
+      const site = getCurrentSite();
+      if (!site) {
+        patternPreview.textContent = "";
+        return;
+      }
+      const url = site.pattern.replace("{num}", sampleNum);
+      patternPreview.textContent = "예시: " + url;
+    }
+
+    // --- 최근 번호 저장/로드 ---
+    function loadRecent() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+        return [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function saveRecent(list) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+      } catch (e) {
+        // 저장 실패 시 조용히 무시
+      }
+    }
+
+    function addRecent(num) {
+      if (!num) return;
+      let list = loadRecent();
+      // 중복 제거 후 맨 앞으로
+      list = list.filter(n => n !== num);
+      list.unshift(num);
+      // 최대 6개까지만
+      if (list.length > 6) list = list.slice(0, 6);
+      saveRecent(list);
+      renderRecent();
+    }
+
+    function renderRecent() {
+      const list = loadRecent();
+      recentList.innerHTML = "";
+      if (!list.length) {
+        recentWrap.style.display = "none";
+        return;
+      }
+      recentWrap.style.display = "block";
+
+      list.forEach(num => {
+        const btn = document.createElement("button");
+        btn.className = "recent-chip";
+        btn.textContent = num;
+        btn.addEventListener("click", () => {
+          numberInput.value = num;
+          numberInput.focus();
+        });
+        recentList.appendChild(btn);
+      });
+    }
+
+    // --- 이동 로직 ---
+    function go() {
+      const num = numberInput.value.trim();
+      if (!num) {
+        alert("번호를 입력하세요.");
+        numberInput.focus();
+        return;
+      }
+
+      const site = getCurrentSite();
+      if (!site) {
+        alert("사이트 선택에 문제가 있습니다.");
+        return;
+      }
+
+      const url = site.pattern.replace("{num}", encodeURIComponent(num));
+      // 최근 번호 저장
+      addRecent(num);
+      // 실제 이동
+      window.location.href = url;
+    }
+
+    // --- 이벤트 바인딩 ---
+    function initEvents() {
+      goButton.addEventListener("click", go);
+
+      numberInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          go();
+        }
+      });
+
+      siteSelect.addEventListener("change", () => {
+        updatePatternPreview();
+      });
+    }
+
+    // --- 초기화 ---
+    (function init() {
+      initSiteSelect();
+      initEvents();
+      renderRecent();
+    })();
+  </script>
+</body>
+</html>
